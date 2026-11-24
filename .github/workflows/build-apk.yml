@@ -1,13 +1,12 @@
 name: Build APK
 
 on:
-  push:
   workflow_dispatch:
     inputs:
       website_ref:
         description: "Branch website LNMusic yang akan dibundel"
         required: false
-        default: "feat/offline-library-player-lyrics-sync"
+        default: "feat/offline-library-redesign"
 
 permissions:
   contents: write
@@ -41,9 +40,14 @@ jobs:
           grep -q 'roomSyncHookTimer' project/www/ln-local.js
           grep -q 'ln-now-playing' project/www/index.html
           grep -q 'ln-player-expand' project/www/index.html
+          grep -q 'ln-library-sidebar' project/www/index.html
+          grep -q 'ln-alphabet' project/www/index.html
+          grep -q 'ln-np-timer' project/www/ln-local.js
           grep -q 'data-lyrics-signature' project/www/ln-local.js
           grep -q 'api/search?q=' project/www/ln-local.js
           grep -q 'itunes.apple.com/search' project/www/ln-local.js
+          grep -q 'getArtwork' patch-android.py
+          grep -q 'android.graphics.BitmapFactory' patch-android.py
           grep -q 'ln-np-queue' project/www/ln-local.js
           grep -q 'Tambah ke antrean' project/www/ln-local.js
           rm -rf web-source
