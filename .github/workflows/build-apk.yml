@@ -74,12 +74,12 @@ jobs:
       - name: Tempel kode LNMusic (izin, layanan latar, ikon)
         run: python3 android-overlay/apply.py
 
-      - name: Sinkronkan
-        run: npx cap sync android
-
       - name: Integrasikan background voice call dan native PiP
         working-directory: .
         run: python3 apply-background-calls-pip.py
+
+      - name: Sinkronkan
+        run: npx cap sync android
 
       - name: Validasi JavaScript LNMusic
         run: node --check www/ln-local.js
