@@ -92,3 +92,5 @@ jobs:
         run: |
           cp project/android/app/build/outputs/apk/debug/app-debug.apk LNMusic.apk
           gh release create "apk-${{ github.run_number }}" LNMusic.apk --repo "${{ github.repository }}" --title "LNMusic APK #${{ github.run_number }}" --notes "Build otomatis dari GitHub Actions."
+
+# Rebuild with the latest LNMusic library and player layout refinements.
