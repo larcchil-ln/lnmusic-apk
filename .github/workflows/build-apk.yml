@@ -43,6 +43,9 @@ jobs:
           grep -q 'ln-player-expand' project/www/index.html
           grep -q 'data-lyrics-signature' project/www/ln-local.js
           grep -q 'api/search?q=' project/www/ln-local.js
+          grep -q 'itunes.apple.com/search' project/www/ln-local.js
+          grep -q 'ln-np-queue' project/www/ln-local.js
+          grep -q 'Tambah ke antrean' project/www/ln-local.js
           rm -rf web-source
 
       - name: Terapkan perbaikan bridge, izin, dan pemindai multi-volume
