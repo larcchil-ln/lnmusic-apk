@@ -131,7 +131,7 @@ for p in ["FOREGROUND_SERVICE_MICROPHONE", "FOREGROUND_SERVICE_CAMERA"]:
     m = m.replace("<application", line + "\n    <application", 1)
 if 'android:name=".CallService"' not in m:
   m = m.replace("</application>", '<service android:name=".CallService" android:exported="false" android:foregroundServiceType="microphone|camera" />\n    </application>', 1)
-m = re.sub(r'(<activity\\b[^>]*android:name="[^"]*MainActivity"[^>]*)(>)',
+m = re.sub(r'(<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*)(>)',
            lambda x: x.group(1) + (' android:supportsPictureInPicture="true"' if 'supportsPictureInPicture' not in x.group(1) else '') + x.group(2), m, count=1)
 manifest.write_text(m, encoding="utf-8")
 
