@@ -3,6 +3,11 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
+    inputs:
+      website_ref:
+        description: "Branch website LNMusic yang akan dibundel"
+        required: false
+        default: "feat/offline-library-player-lyrics-sync"
 
 permissions:
   contents: write
@@ -22,12 +27,17 @@ jobs:
 
       - name: Ambil website LNMusic terbaru dan bundel secara lokal
         working-directory: .
+        env:
+          WEBSITE_REF: ${{ inputs.website_ref || 'feat/offline-library-player-lyrics-sync' }}
         run: |
-          git clone --depth 1 https://github.com/larcchil-ln/lnmusic.git web-source
+          git clone --depth 1 --branch "$WEBSITE_REF" https://github.com/larcchil-ln/lnmusic.git web-source
+          echo "Website ref: $WEBSITE_REF"
+          git -C web-source rev-parse HEAD
           mkdir -p project/www
           rsync -a --delete --exclude='.git' web-source/ project/www/
           test -s project/www/index.html
           grep -q 'ln-local.js' project/www/index.html
+          grep -q 'SYNC_LOCAL_TRACK' project/www/ln-local.js
           rm -rf web-source
 
       - name: Terapkan perbaikan bridge, izin, dan pemindai multi-volume
