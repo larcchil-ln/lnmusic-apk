@@ -39,6 +39,10 @@ jobs:
           grep -q 'ln-local.js' project/www/index.html
           grep -q 'SYNC_LOCAL_TRACK' project/www/ln-local.js
           grep -q 'roomSyncHookTimer' project/www/ln-local.js
+          grep -q 'ln-now-playing' project/www/index.html
+          grep -q 'ln-player-expand' project/www/index.html
+          grep -q 'data-lyrics-signature' project/www/ln-local.js
+          grep -q 'api/search?q=' project/www/ln-local.js
           rm -rf web-source
 
       - name: Terapkan perbaikan bridge, izin, dan pemindai multi-volume
