@@ -25,7 +25,11 @@ LOCAL_PLUGIN = r'''package com.lnmusic.app;
 
 import android.Manifest;
 import android.content.ContentUris;
-import android.content.Intent;\nimport android.graphics.Bitmap;\nimport android.graphics.BitmapFactory;\nimport android.util.Base64;\nimport java.io.ByteArrayOutputStream;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
+import java.io.ByteArrayOutputStream;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
