@@ -1,0 +1,32 @@
+name: Validate LNMusic sources
+
+on:
+  push:
+    paths:
+      - "patch-android.py"
+      - ".github/workflows/validate-library-source.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Android patch script syntax
+        run: python -m py_compile patch-android.py
+      - name: Fetch redesigned website source
+        run: |
+          git clone --depth 1 --branch feat/offline-library-redesign https://github.com/larcchil-ln/lnmusic.git web-source
+          node --check web-source/ln-local.js
+          grep -q 'ln-library-sidebar' web-source/index.html
+          grep -q 'ln-alphabet' web-source/index.html
+          grep -q 'ln-np-timer' web-source/ln-local.js
+          grep -q 'getArtwork' web-source/ln-local.js
+          grep -q 'public void getArtwork' patch-android.py
+          grep -q 'android.graphics.BitmapFactory' patch-android.py
