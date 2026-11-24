@@ -18,6 +18,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
       - name: Validate Android patch script syntax
         run: python -m py_compile patch-android.py
       - name: Fetch redesigned website source
@@ -30,3 +34,17 @@ jobs:
           grep -q 'getArtwork' web-source/ln-local.js
           grep -q 'public void getArtwork' patch-android.py
           grep -q 'android.graphics.BitmapFactory' patch-android.py
+      - name: Prepare Android project for Java compilation
+        run: |
+          unzip -q lnmusic-apk.zip -d project
+          mkdir -p project/www
+          rsync -a --delete web-source/ project/www/
+          python3 patch-android.py project
+          cd project
+          npm install
+          npx cap add android
+          python3 android-overlay/apply.py
+          npx cap sync android
+      - name: Compile Android Java plugins without packaging APK
+        working-directory: project/android
+        run: chmod +x gradlew && ./gradlew compileDebugJavaWithJavac --stacktrace
