@@ -65,6 +65,9 @@ jobs:
       - name: Sinkronkan
         run: npx cap sync android
 
+      - name: Validasi JavaScript LNMusic
+        run: node --check www/ln-local.js
+
       - name: Build APK
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug --stacktrace
 
