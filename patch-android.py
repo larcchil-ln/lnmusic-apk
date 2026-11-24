@@ -25,7 +25,7 @@ LOCAL_PLUGIN = r'''package com.lnmusic.app;
 
 import android.Manifest;
 import android.content.ContentUris;
-import android.content.Intent;
+import android.content.Intent;\nimport android.graphics.Bitmap;\nimport android.graphics.BitmapFactory;\nimport android.util.Base64;\nimport java.io.ByteArrayOutputStream;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -241,6 +241,44 @@ public class LocalMusicPlugin extends Plugin {
   }
 
   @PluginMethod
+  @PluginMethod
+  public void getArtwork(PluginCall call) {
+    long id = call.getLong("id", -1L);
+    MusicService.Item item = LIB.get(id);
+    if (item == null || item.albumUri == null) { call.resolve(new JSObject()); return; }
+    try (java.io.InputStream in = getContext().getContentResolver().openInputStream(item.albumUri)) {
+      if (in == null) { call.resolve(new JSObject()); return; }
+      byte[] raw = readAll(in);
+      BitmapFactory.Options bounds = new BitmapFactory.Options();
+      bounds.inJustDecodeBounds = true;
+      BitmapFactory.decodeByteArray(raw, 0, raw.length, bounds);
+      BitmapFactory.Options opts = new BitmapFactory.Options();
+      opts.inSampleSize = Math.max(1, Math.min(bounds.outWidth, bounds.outHeight) / 512);
+      Bitmap bitmap = BitmapFactory.decodeByteArray(raw, 0, raw.length, opts);
+      if (bitmap == null) { call.resolve(new JSObject()); return; }
+      Bitmap scaled = bitmap;
+      if (bitmap.getWidth() > 512 || bitmap.getHeight() > 512) {
+        float scale = Math.min(512f / bitmap.getWidth(), 512f / bitmap.getHeight());
+        scaled = Bitmap.createScaledBitmap(bitmap, Math.max(1, Math.round(bitmap.getWidth()*scale)), Math.max(1, Math.round(bitmap.getHeight()*scale)), true);
+        if (scaled != bitmap) bitmap.recycle();
+      }
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      scaled.compress(Bitmap.CompressFormat.JPEG, 84, out);
+      scaled.recycle();
+      JSObject result = new JSObject();
+      result.put("dataUrl", "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP));
+      call.resolve(result);
+    } catch (Exception e) { call.resolve(new JSObject()); }
+  }
+
+  private byte[] readAll(java.io.InputStream input) throws java.io.IOException {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    byte[] buffer = new byte[8192];
+    int count;
+    while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+    return output.toByteArray();
+  }
+
   public void getState(PluginCall call) { call.resolve(MusicService.snapshot()); }
 }
 '''
