@@ -20,6 +20,20 @@ jobs:
         working-directory: .
         run: unzip -q lnmusic-apk.zip -d project
 
+      - name: Ambil website LNMusic terbaru dan bundel secara lokal
+        working-directory: .
+        run: |
+          git clone --depth 1 https://github.com/larcchil-ln/lnmusic.git web-source
+          mkdir -p project/www
+          rsync -a --delete --exclude='.git' web-source/ project/www/
+          test -s project/www/index.html
+          grep -q 'ln-local.js' project/www/index.html
+          rm -rf web-source
+
+      - name: Terapkan perbaikan bridge, izin, dan pemindai multi-volume
+        working-directory: .
+        run: python3 patch-android.py project
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
