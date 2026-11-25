@@ -72,7 +72,7 @@ jobs:
           src = p.read_text()
           import re
           new = """    async function fetchTurn() {
-                const url = 'https://lnmusic.web.id/api/turn';
+                const url = 'https://www.lnmusic.web.id/api/turn';
                 const C = window.Capacitor;
                 const native = !!(C && ((C.isNativePlatform && C.isNativePlatform()) || (C.getPlatform && C.getPlatform() !== 'web')));
                 const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 12000);
