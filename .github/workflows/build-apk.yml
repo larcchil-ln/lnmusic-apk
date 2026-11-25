@@ -152,6 +152,22 @@ jobs:
           set -euo pipefail
           find www -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
 
+      - name: Validasi script inline di index.html
+        run: |
+          python3 - <<'PY'
+          import re, subprocess, sys, pathlib
+          s = pathlib.Path('www/index.html').read_text(encoding='utf-8')
+          bad = 0
+          for i, m in enumerate(re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>', s, re.S), 1):
+              p = pathlib.Path('/tmp/inline-%d.js' % i)
+              p.write_text(m.group(1), encoding='utf-8')
+              r = subprocess.run(['node', '--check', str(p)], capture_output=True, text=True)
+              if r.returncode:
+                  bad += 1
+                  print('Script inline #%d error:' % i, r.stderr[:500])
+          sys.exit(1 if bad else 0)
+          PY
+
       - name: Build APK
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug --stacktrace
 
