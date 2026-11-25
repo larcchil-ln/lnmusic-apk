@@ -12,7 +12,7 @@ on:
       website_ref:
         description: "Branch website LNMusic yang akan dibundel"
         required: false
-        default: "fix/youtube-sync-library-redesign"
+        default: "feat/offline-library-redesign"
 
 permissions:
   contents: write
@@ -33,7 +33,7 @@ jobs:
       - name: Ambil website LNMusic terbaru dan bundel secara lokal
         working-directory: .
         env:
-          WEBSITE_REF: ${{ inputs.website_ref || 'fix/youtube-sync-library-redesign' }}
+          WEBSITE_REF: ${{ inputs.website_ref || 'feat/offline-library-redesign' }}
         run: |
           git clone --depth 1 --branch "$WEBSITE_REF" https://github.com/larcchil-ln/lnmusic.git web-source
           echo "Website ref: $WEBSITE_REF"
