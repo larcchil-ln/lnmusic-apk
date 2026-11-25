@@ -105,6 +105,23 @@ jobs:
           print("CapacitorHttp enabled; fetchTurn patched for Android native HTTP.")
           PY
 
+      - name: Tambahkan panel diagnostik WebView khusus APK
+        working-directory: .
+        run: |
+          mkdir -p project/www
+          cp diagnostics/ln-apk-diagnostics.js project/www/ln-apk-diagnostics.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('project/www/index.html')
+          s = p.read_text(encoding='utf-8')
+          tag = '<script src="./ln-apk-diagnostics.js"></script>'
+          if tag not in s:
+              pos = s.lower().rfind('</body>')
+              if pos < 0: raise SystemExit('index.html tidak memiliki penutup body')
+              s = s[:pos] + tag + '\\n' + s[pos:]
+              p.write_text(s, encoding='utf-8')
+          PY
+
       - name: Terapkan perbaikan bridge, izin, dan pemindai multi-volume
         working-directory: .
         run: python3 patch-android.py project
@@ -130,8 +147,10 @@ jobs:
       - name: Sinkronkan
         run: npx cap sync android
 
-      - name: Validasi JavaScript LNMusic
-        run: node --check www/ln-local.js
+      - name: Validasi seluruh JavaScript LNMusic
+        run: |
+          set -euo pipefail
+          find www -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
 
       - name: Build APK
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug --stacktrace
