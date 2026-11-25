@@ -1,12 +1,14 @@
 name: Build APK
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       website_ref:
         description: "Branch website LNMusic yang akan dibundel"
         required: false
-        default: "feat/offline-library-redesign"
+        default: "main"
 
 permissions:
   contents: write
@@ -27,7 +29,7 @@ jobs:
       - name: Ambil website LNMusic terbaru dan bundel secara lokal
         working-directory: .
         env:
-          WEBSITE_REF: ${{ inputs.website_ref || 'feat/offline-library-player-lyrics-sync' }}
+          WEBSITE_REF: ${{ inputs.website_ref || 'main' }}
         run: |
           git clone --depth 1 --branch "$WEBSITE_REF" https://github.com/larcchil-ln/lnmusic.git web-source
           echo "Website ref: $WEBSITE_REF"
@@ -74,6 +76,10 @@ jobs:
       - name: Tempel kode LNMusic (izin, layanan latar, ikon)
         run: python3 android-overlay/apply.py
 
+      - name: Integrasikan background voice call dan native PiP
+        working-directory: .
+        run: python3 apply-background-calls-pip.py
+
       - name: Sinkronkan
         run: npx cap sync android
 
@@ -90,6 +96,7 @@ jobs:
           path: project/android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Terbitkan APK di Releases (unduhan langsung)
+        if: github.event_name != 'pull_request'
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}

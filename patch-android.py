@@ -245,7 +245,6 @@ public class LocalMusicPlugin extends Plugin {
   }
 
   @PluginMethod
-  @PluginMethod
   public void getArtwork(PluginCall call) {
     long id = call.getLong("id", -1L);
     MusicService.Item item = LIB.get(id);
