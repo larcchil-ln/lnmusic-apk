@@ -282,7 +282,7 @@ public class LocalMusicPlugin extends Plugin {
     return output.toByteArray();
   }
 
-  public void getState(PluginCall call) { call.resolve(MusicService.snapshot()); }
+  @PluginMethod\n  public void getState(PluginCall call) { call.resolve(MusicService.snapshot()); }
 }
 '''
 
