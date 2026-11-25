@@ -152,3 +152,5 @@ jobs:
 
 # Rebuild stable APK source and resolve CapacitorHttp via legacy Plugins or registerPlugin.
 # Keep experimental room-sync changes out of this APK build.
+
+# Rebuild after Android WebView runtime parse fix.
