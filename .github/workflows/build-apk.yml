@@ -67,7 +67,7 @@ jobs:
           cfg = Path("project/capacitor.config.json")
           data = json.loads(cfg.read_text())
           data.setdefault("plugins", {}).setdefault("CapacitorHttp", {})["enabled"] = True
-          cfg.write_text(json.dumps(data, indent=2) + "\\n")
+          cfg.write_text(json.dumps(data, indent=2) + "\n")
           p = Path("project/www/index.html")
           src = p.read_text()
           import re
@@ -93,11 +93,11 @@ jobs:
                   return j.iceServers;
                 } finally { clearTimeout(t); }
               }"""
-          patched, count = re.subn(r"async function fetchTurn\\(\\)\\s*\\{.*?\\n {4}\\}", lambda m: new, src, count=1, flags=re.S)
+          patched, count = re.subn(r"async function fetchTurn\(\)\s*\{.*?\n {4}\}", lambda m: new, src, count=1, flags=re.S)
           if count != 1:
               raise SystemExit("fetchTurn tidak ditemukan dengan pola yang diharapkan; build dihentikan.")
           src = patched
-          p.write_text(src.replace(old, new, 1))
+          p.write_text(src)
           print("CapacitorHttp enabled; fetchTurn patched for Android native HTTP.")
           PY
 
