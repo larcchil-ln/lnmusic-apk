@@ -12,7 +12,7 @@ on:
       website_ref:
         description: "Branch website LNMusic yang akan dibundel"
         required: false
-        default: "fix/android-youtube-room-sync-apk"
+        default: "fix/youtube-sync-library-redesign"
 
 permissions:
   contents: write
@@ -33,7 +33,7 @@ jobs:
       - name: Ambil website LNMusic terbaru dan bundel secara lokal
         working-directory: .
         env:
-          WEBSITE_REF: ${{ inputs.website_ref || 'fix/android-youtube-room-sync-apk' }}
+          WEBSITE_REF: ${{ inputs.website_ref || 'fix/youtube-sync-library-redesign' }}
         run: |
           git clone --depth 1 --branch "$WEBSITE_REF" https://github.com/larcchil-ln/lnmusic.git web-source
           echo "Website ref: $WEBSITE_REF"
