@@ -1,6 +1,12 @@
 name: Build APK
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-apk.yml"
+      - "lnmusic-apk.zip"
+      - "patch-android.py"
   workflow_dispatch:
     inputs:
       website_ref:
@@ -51,6 +57,56 @@ jobs:
           grep -q 'ln-np-queue' project/www/ln-local.js
           grep -q 'Tambah ke antrean' project/www/ln-local.js
           rm -rf web-source
+
+      - name: Aktifkan HTTP native Capacitor dan perbaiki pengambilan TURN di APK
+        working-directory: .
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          cfg = Path("project/capacitor.config.json")
+          data = json.loads(cfg.read_text())
+          data.setdefault("plugins", {}).setdefault("CapacitorHttp", {})["enabled"] = True
+          cfg.write_text(json.dumps(data, indent=2) + "\\n")
+          p = Path("project/www/index.html")
+          src = p.read_text()
+          old = """    async function fetchTurn() {
+                const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 7000);
+                try {
+                  const r = await fetch('/api/turn', { signal: ctrl.signal, cache: 'no-store' });
+                  const j = await r.json().catch(() => null);
+                  if (!r.ok) throw new Error((j && j.error) || 'HTTP ' + r.status);
+                  if (!j || !Array.isArray(j.iceServers) || !j.iceServers.length) throw new Error('Respons kosong');
+                  return j.iceServers;
+                } finally { clearTimeout(t); }
+              }"""
+          new = """    async function fetchTurn() {
+                const url = 'https://lnmusic.web.id/api/turn';
+                const C = window.Capacitor;
+                const native = !!(C && ((C.isNativePlatform && C.isNativePlatform()) || (C.getPlatform && C.getPlatform() !== 'web')));
+                const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 12000);
+                try {
+                  const http = native && C && C.Plugins && C.Plugins.CapacitorHttp;
+                  if (http && typeof http.request === 'function') {
+                    const response = await http.request({ url, method: 'GET', headers: { 'Cache-Control': 'no-cache' }, connectTimeout: 10000, readTimeout: 10000 });
+                    let j = response && response.data;
+                    if (typeof j === 'string') { try { j = JSON.parse(j); } catch (_) { j = null; } }
+                    if (!response || response.status < 200 || response.status >= 300) throw new Error((j && j.error) || ('HTTP ' + (response && response.status || 'gagal')));
+                    if (!j || !Array.isArray(j.iceServers) || !j.iceServers.length) throw new Error('Respons TURN kosong');
+                    return j.iceServers;
+                  }
+                  const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store', mode: 'cors' });
+                  const j = await r.json().catch(() => null);
+                  if (!r.ok) throw new Error((j && j.error) || 'HTTP ' + r.status);
+                  if (!j || !Array.isArray(j.iceServers) || !j.iceServers.length) throw new Error('Respons kosong');
+                  return j.iceServers;
+                } finally { clearTimeout(t); }
+              }"""
+          if old not in src:
+              raise SystemExit("fetchTurn source tidak cocok; build dihentikan agar tidak merusak file.")
+          p.write_text(src.replace(old, new, 1))
+          print("CapacitorHttp enabled; fetchTurn patched for Android native HTTP.")
+          PY
 
       - name: Terapkan perbaikan bridge, izin, dan pemindai multi-volume
         working-directory: .
