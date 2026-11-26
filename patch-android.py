@@ -397,6 +397,30 @@ for name, declaration in services:
 manifest.write_text(text, encoding="utf-8")
 
 shutil.copytree("android-overlay/res", base / "res", dirs_exist_ok=True)
+
+# --- Splash peluncuran: logo di atas latar gradien putih -> hijau ---
+import re
+styles = base / "res/values/styles.xml"
+if styles.exists():
+    st = styles.read_text(encoding="utf-8")
+    m = re.search(r'<style name="AppTheme\.NoActionBarLaunch"\s+parent="([^"]+)"\s*>.*?</style>', st, re.S)
+    parent = m.group(1) if m else "Theme.SplashScreen"
+    items = ['        <item name="android:background">@drawable/ln_splash</item>']
+    if "SplashScreen" in parent:
+        items += [
+            '        <item name="windowSplashScreenBackground">#FFFFFF</item>',
+            '        <item name="windowSplashScreenAnimatedIcon">@drawable/ln_splash_icon</item>',
+            '        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>',
+        ]
+    blk = '<style name="AppTheme.NoActionBarLaunch" parent="' + parent + '">\n' + "\n".join(items) + '\n    </style>'
+    if m:
+        st = st[:m.start()] + blk + st[m.end():]
+    else:
+        st = st.replace("</resources>", "    " + blk + "\n</resources>", 1)
+    styles.write_text(st, encoding="utf-8")
+    print("LNMusic splash theme applied (parent=" + parent + ")")
+else:
+    print("styles.xml tidak ditemukan; splash native dilewati")
 print("LNMusic Android overlay, media permissions, and services applied.")
 '''
 (overlay / "apply.py").write_text(apply_py, encoding="utf-8")
