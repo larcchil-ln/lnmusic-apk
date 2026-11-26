@@ -1,46 +1,75 @@
-# Ganti isi .github/workflows/build-apk.yml di repo lnmusic-apk dengan file ini.
+# Taruh sebagai .github/workflows/build-apk.yml di repo lnmusic-apk (timpa isi yang lama).
+# Kalau file lnmusic-main-final.zip ada di root repo ini, web yang dibundel ke APK diambil dari situ.
+# Kalau tidak ada, web diambil dari repo lnmusic (branch web_ref).
 name: Build APK
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      web_ref:
+        description: 'Branch repo web (dipakai hanya kalau tidak ada lnmusic-main-final.zip)'
+        default: 'main'
   push:
     branches: [main]
+    paths:
+      - 'patch-android.py'
+      - 'lnmusic-apk.zip'
+      - 'lnmusic-main-final.zip'
+      - '.github/workflows/build-apk.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Tampilkan isi repo (untuk diagnosis)
-        run: find . -maxdepth 3 -not -path './.git*' -not -path '*/node_modules*' | sort | head -100
-
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'   # kalau proyek Capacitor 5/6 atau Gradle lama, ganti ke '17'
+          java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Pasang dependensi Node (kalau ada)
+      - name: Siapkan source web
         run: |
-          if [ -f package.json ]; then npm install; fi
-          if [ -f package.json ] && ls capacitor.config.* >/dev/null 2>&1; then npx cap sync android || true; fi
+          if [ -f lnmusic-main-final.zip ]; then
+            mkdir web-tmp && unzip -q lnmusic-main-final.zip -d web-tmp
+            D=$(dirname "$(find web-tmp -maxdepth 3 -name index.html | head -n1)")
+            mv "$D" web-source
+          else
+            git clone --depth 1 --branch "${{ github.event.inputs.web_ref || 'main' }}" https://github.com/larcchil-ln/lnmusic.git web-source
+          fi
+          test -f web-source/index.html && test -f web-source/ln-local.js
+
+      - name: Siapkan proyek Android
+        run: |
+          unzip -q lnmusic-apk.zip -d project
+          mkdir -p project/www
+          rsync -a --delete --exclude '.git' --exclude 'api' web-source/ project/www/
+          python3 patch-android.py project
+          # Request jaringan lewat HTTP native supaya tidak kena CORS dari origin https://localhost
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path('project/capacitor.config.json')
+          c = json.loads(p.read_text(encoding='utf-8'))
+          c.setdefault('plugins', {})['CapacitorHttp'] = {'enabled': True}
+          p.write_text(json.dumps(c, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+          cd project
+          npm install
+          npx cap add android
+          python3 android-overlay/apply.py
+          npx cap sync android
 
       - name: Build APK debug
+        working-directory: project/android
         run: |
-          S=$(find . \( -name settings.gradle -o -name settings.gradle.kts \) -not -path '*/node_modules/*' | head -n1)
-          test -n "$S" || { echo "Tidak ada proyek Android (settings.gradle) di repo ini"; exit 1; }
-          D=$(dirname "$S")
-          cd "$D"
-          if [ -f ./gradlew ]; then chmod +x ./gradlew && ./gradlew assembleDebug --no-daemon; else gradle assembleDebug --no-daemon; fi
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
           name: LNMusic-debug-apk
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: project/android/app/build/outputs/apk/debug/*.apk
