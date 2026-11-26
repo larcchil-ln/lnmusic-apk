@@ -248,16 +248,9 @@ public class LocalMusicPlugin extends Plugin {
   public void getArtwork(PluginCall call) {
     long id = call.getLong("id", -1L);
     MusicService.Item item = LIB.get(id);
-    if (item == null || item.albumUri == null) { call.resolve(new JSObject()); return; }
-    try (java.io.InputStream in = getContext().getContentResolver().openInputStream(item.albumUri)) {
-      if (in == null) { call.resolve(new JSObject()); return; }
-      byte[] raw = readAll(in);
-      BitmapFactory.Options bounds = new BitmapFactory.Options();
-      bounds.inJustDecodeBounds = true;
-      BitmapFactory.decodeByteArray(raw, 0, raw.length, bounds);
-      BitmapFactory.Options opts = new BitmapFactory.Options();
-      opts.inSampleSize = Math.max(1, Math.min(bounds.outWidth, bounds.outHeight) / 512);
-      Bitmap bitmap = BitmapFactory.decodeByteArray(raw, 0, raw.length, opts);
+    if (item == null) { call.resolve(new JSObject()); return; }
+    try {
+      Bitmap bitmap = loadArt(item);
       if (bitmap == null) { call.resolve(new JSObject()); return; }
       Bitmap scaled = bitmap;
       if (bitmap.getWidth() > 512 || bitmap.getHeight() > 512) {
@@ -274,6 +267,40 @@ public class LocalMusicPlugin extends Plugin {
     } catch (Exception e) { call.resolve(new JSObject()); }
   }
 
+  private Bitmap decodeBytes(byte[] raw) {
+    if (raw == null || raw.length == 0) return null;
+    BitmapFactory.Options bounds = new BitmapFactory.Options();
+    bounds.inJustDecodeBounds = true;
+    BitmapFactory.decodeByteArray(raw, 0, raw.length, bounds);
+    BitmapFactory.Options opts = new BitmapFactory.Options();
+    opts.inSampleSize = Math.max(1, Math.min(bounds.outWidth, bounds.outHeight) / 512);
+    return BitmapFactory.decodeByteArray(raw, 0, raw.length, opts);
+  }
+
+  // Urutan: album art MediaStore -> thumbnail sistem (Android 10+) -> sampul yang tertanam di file musik
+  private Bitmap loadArt(MusicService.Item item) {
+    if (item.albumUri != null) {
+      try (java.io.InputStream in = getContext().getContentResolver().openInputStream(item.albumUri)) {
+        if (in != null) { Bitmap b = decodeBytes(readAll(in)); if (b != null) return b; }
+      } catch (Exception ignored) { }
+    }
+    if (Build.VERSION.SDK_INT >= 29 && item.uri != null) {
+      try { return getContext().getContentResolver().loadThumbnail(item.uri, new android.util.Size(512, 512), null); } catch (Exception ignored) { }
+    }
+    if (item.uri != null) {
+      android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+      try {
+        r.setDataSource(getContext(), item.uri);
+        Bitmap b = decodeBytes(r.getEmbeddedPicture());
+        if (b != null) return b;
+      } catch (Exception ignored) {
+      } finally {
+        try { r.release(); } catch (Exception ignored) { }
+      }
+    }
+    return null;
+  }
+
   private byte[] readAll(java.io.InputStream input) throws java.io.IOException {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     byte[] buffer = new byte[8192];
@@ -284,6 +311,21 @@ public class LocalMusicPlugin extends Plugin {
 
   @PluginMethod
   public void getState(PluginCall call) { call.resolve(MusicService.snapshot()); }
+
+  @PluginMethod
+  public void fxInfo(PluginCall call) { call.resolve(MusicService.fxInfo()); }
+
+  @PluginMethod
+  public void fxSet(PluginCall call) {
+    boolean on = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+    int bass = call.getInt("bass", 0);
+    int virt = call.getInt("virt", 0);
+    JSArray lv = call.getArray("levels", new JSArray());
+    short[] levels = new short[lv.length()];
+    for (int i = 0; i < levels.length; i++) levels[i] = (short) lv.optInt(i, 0);
+    MusicService.fxSet(on, levels, bass, virt);
+    call.resolve();
+  }
 }
 '''
 
