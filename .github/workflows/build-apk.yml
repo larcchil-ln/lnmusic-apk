@@ -1,192 +1,40 @@
+# Taruh di repo lnmusic-apk sebagai: .github/workflows/build-apk.yml
+# Lalu buka tab Actions -> "Build APK" -> Run workflow. APK muncul di bagian Artifacts.
 name: Build APK
-
 on:
+  workflow_dispatch: {}
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/build-apk.yml"
-      - "lnmusic-apk.zip"
-      - "patch-android.py"
-  workflow_dispatch:
-    inputs:
-      website_ref:
-        description: "Branch website LNMusic yang akan dibundel"
-        required: false
-        default: "feat/offline-library-redesign"
-
-permissions:
-  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: project
     steps:
       - uses: actions/checkout@v4
-
-      - name: Ekstrak proyek dari zip
-        working-directory: .
-        run: unzip -q lnmusic-apk.zip -d project
-
-      - name: Ambil website LNMusic terbaru dan bundel secara lokal
-        working-directory: .
-        env:
-          WEBSITE_REF: ${{ inputs.website_ref || 'feat/offline-library-redesign' }}
-        run: |
-          git clone --depth 1 --branch "$WEBSITE_REF" https://github.com/larcchil-ln/lnmusic.git web-source
-          echo "Website ref: $WEBSITE_REF"
-          git -C web-source rev-parse HEAD
-          mkdir -p project/www
-          rsync -a --delete --exclude='.git' web-source/ project/www/
-          test -s project/www/index.html
-          grep -q 'ln-local.js' project/www/index.html
-          grep -q 'SYNC_LOCAL_TRACK' project/www/ln-local.js
-          grep -q 'roomSyncHookTimer' project/www/ln-local.js
-          grep -q 'ln-now-playing' project/www/index.html
-          grep -q 'ln-player-expand' project/www/index.html
-          grep -q 'ln-library-sidebar' project/www/index.html
-          grep -q 'ln-alphabet' project/www/index.html
-          grep -q 'ln-np-timer' project/www/ln-local.js
-          grep -q 'data-lyrics-signature' project/www/ln-local.js
-          grep -q 'api/search?q=' project/www/ln-local.js
-          grep -q 'itunes.apple.com/search' project/www/ln-local.js
-          grep -q 'getArtwork' patch-android.py
-          grep -q 'android.graphics.BitmapFactory' patch-android.py
-          grep -q 'ln-np-queue' project/www/ln-local.js
-          grep -q 'Tambah ke antrean' project/www/ln-local.js
-          rm -rf web-source
-
-      - name: Aktifkan HTTP native Capacitor dan perbaiki pengambilan TURN di APK
-        working-directory: .
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          cfg = Path("project/capacitor.config.json")
-          data = json.loads(cfg.read_text())
-          data.setdefault("plugins", {}).setdefault("CapacitorHttp", {})["enabled"] = True
-          cfg.write_text(json.dumps(data, indent=2) + "\n")
-          p = Path("project/www/index.html")
-          src = p.read_text()
-          import re
-          new = """    async function fetchTurn() {
-                const url = 'https://www.lnmusic.web.id/api/turn';
-                const C = window.Capacitor;
-                const native = !!(C && ((C.isNativePlatform && C.isNativePlatform()) || (C.getPlatform && C.getPlatform() !== 'web')));
-                const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 12000);
-                try {
-                  let http = native && C && C.Plugins && C.Plugins.CapacitorHttp;
-                  // Capacitor 6 may expose built-in plugins through registerPlugin, not C.Plugins.
-                  if (!http && native && C && typeof C.registerPlugin === 'function') {
-                    try { http = C.registerPlugin('CapacitorHttp'); } catch (_) {}
-                  }
-                  if (http && typeof http.request === 'function') {
-                    const response = await http.request({ url, method: 'GET', headers: { 'Cache-Control': 'no-cache' }, connectTimeout: 10000, readTimeout: 10000 });
-                    let j = response && response.data;
-                    if (typeof j === 'string') { try { j = JSON.parse(j); } catch (_) { j = null; } }
-                    if (!response || response.status < 200 || response.status >= 300) throw new Error((j && j.error) || ('HTTP ' + (response && response.status || 'gagal')));
-                    if (!j || !Array.isArray(j.iceServers) || !j.iceServers.length) throw new Error('Respons TURN kosong');
-                    return j.iceServers;
-                  }
-                  const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store', mode: 'cors' });
-                  const j = await r.json().catch(() => null);
-                  if (!r.ok) throw new Error((j && j.error) || 'HTTP ' + r.status);
-                  if (!j || !Array.isArray(j.iceServers) || !j.iceServers.length) throw new Error('Respons kosong');
-                  return j.iceServers;
-                } finally { clearTimeout(t); }
-              }"""
-          patched, count = re.subn(r"async function fetchTurn\(\)\s*\{.*?\n {4}\}", lambda m: new, src, count=1, flags=re.S)
-          if count != 1:
-              raise SystemExit("fetchTurn tidak ditemukan dengan pola yang diharapkan; build dihentikan.")
-          src = patched
-          p.write_text(src)
-          print("CapacitorHttp enabled; fetchTurn patched for Android native HTTP.")
-          PY
-
-      - name: Tambahkan panel diagnostik WebView khusus APK
-        working-directory: .
-        run: |
-          mkdir -p project/www
-          cp diagnostics/ln-apk-diagnostics.js project/www/ln-apk-diagnostics.js
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('project/www/index.html')
-          s = p.read_text(encoding='utf-8')
-          tag = '<script src="./ln-apk-diagnostics.js"></script>'
-          if tag not in s:
-              pos = s.lower().rfind('</body>')
-              if pos < 0: raise SystemExit('index.html tidak memiliki penutup body')
-              s = s[:pos] + tag + '\\n' + s[pos:]
-              p.write_text(s, encoding='utf-8')
-          PY
-
-      - name: Terapkan perbaikan bridge, izin, dan pemindai multi-volume
-        working-directory: .
-        run: python3 patch-android.py project
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '21'   # Capacitor 7 butuh 21. Kalau proyekmu Capacitor 5/6, ganti ke '17'.
 
-      - name: Pasang dependensi
-        run: npm install
-
-      - name: Buat proyek Android
-        run: npx cap add android
-
-      - name: Tempel kode LNMusic (izin, layanan latar, ikon)
-        run: python3 android-overlay/apply.py
-
-      - name: Sinkronkan
-        run: npx cap sync android
-
-      - name: Validasi seluruh JavaScript LNMusic
-        run: |
-          set -euo pipefail
-          find www -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
-
-      - name: Validasi script inline di index.html
-        run: |
-          python3 - <<'PY'
-          import re, subprocess, sys, pathlib
-          s = pathlib.Path('www/index.html').read_text(encoding='utf-8')
-          bad = 0
-          for i, m in enumerate(re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>', s, re.S), 1):
-              p = pathlib.Path('/tmp/inline-%d.js' % i)
-              p.write_text(m.group(1), encoding='utf-8')
-              r = subprocess.run(['node', '--check', str(p)], capture_output=True, text=True)
-              if r.returncode:
-                  bad += 1
-                  print('Script inline #%d error:' % i, r.stderr[:500])
-          sys.exit(1 if bad else 0)
-          PY
-
-      - name: Build APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --stacktrace
-
-      - name: Simpan sebagai artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: LNMusic-apk
-          path: project/android/app/build/outputs/apk/debug/app-debug.apk
+          node-version: '20'
 
-      - name: Terbitkan APK di Releases (unduhan langsung)
-        working-directory: .
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Pasang dependensi & sinkron Capacitor
         run: |
-          cp project/android/app/build/outputs/apk/debug/app-debug.apk LNMusic.apk
-          gh release create "apk-${{ github.run_number }}" LNMusic.apk --repo "${{ github.repository }}" --title "LNMusic APK #${{ github.run_number }}" --notes "Build otomatis dari GitHub Actions."
+          if [ -f package.json ]; then npm install; fi
+          if [ -f capacitor.config.json ] || [ -f capacitor.config.ts ] || [ -f capacitor.config.js ]; then npx cap sync android || true; fi
 
-# Rebuild stable APK source and resolve CapacitorHttp via legacy Plugins or registerPlugin.
-# Keep experimental room-sync changes out of this APK build.
+      - name: Build APK debug
+        run: |
+          G=$(find . -name gradlew -not -path '*/node_modules/*' | head -n1)
+          test -n "$G" || { echo "gradlew tidak ditemukan"; exit 1; }
+          D=$(dirname "$G")
+          chmod +x "$G"
+          cd "$D" && ./gradlew assembleDebug --no-daemon
 
-# Rebuild after Android WebView runtime parse fix.
-# Rebuild stable APK after canonical TURN host fix in website PR #10.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LNMusic-debug-apk
+          path: '**/build/outputs/apk/debug/*.apk'
