@@ -45,7 +45,17 @@ jobs:
 
       - name: Siapkan proyek Android
         run: |
+          ls -la lnmusic-apk.zip
+          unzip -l lnmusic-apk.zip | head -25
           unzip -q lnmusic-apk.zip -d project
+          # Kalau isi zip ada di dalam satu folder, naikkan ke project/
+          C=$(find project -maxdepth 3 -name capacitor.config.json | head -n1)
+          if [ -z "$C" ]; then
+            echo "capacitor.config.json tidak ada di lnmusic-apk.zip. Isi project:"; find project -maxdepth 3 | head -50; exit 1
+          fi
+          if [ "$(dirname "$C")" != "project" ]; then
+            mv project project-old && mv "$(dirname "$C")" project
+          fi
           mkdir -p project/www
           rsync -a --delete --exclude '.git' --exclude 'api' web-source/ project/www/
           python3 patch-android.py project
