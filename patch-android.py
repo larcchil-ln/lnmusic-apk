@@ -367,6 +367,7 @@ permissions = [
     ('MODIFY_AUDIO_SETTINGS', None),
     ('POST_NOTIFICATIONS', None),
     ('WAKE_LOCK', None),
+    ('VIBRATE', None),
     ('FOREGROUND_SERVICE', None),
     ('FOREGROUND_SERVICE_MEDIA_PLAYBACK', None),
     ('READ_EXTERNAL_STORAGE', '32'),
